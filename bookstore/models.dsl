@@ -1,9 +1,14 @@
-workspace extends ../system-catalog.dsl {
-    name "Bookstore Platform"
-    description "Internet bookstore platform"
+workspace {
     model {
-        !extend bookstoreSystem {
-             # Level 2: Containers
+        # People/Actors
+        # <variable> = person <name> <description> <tag>
+        publicUser = person "Public User" "An anonymous user of the bookstore" "User"
+        authorizedUser = person "Authorized User" "A registered user of the bookstore, with personal account" "User"
+
+        # Software Systems
+        # <variable> = softwareSystem <name> <description> <tag>
+        bookstoreSystem = softwareSystem "iBookstore System" "Allows users to view about book, and administrate the book details" "Target System" {
+            # Level 2: Containers
             # <variable> = container <name> <description> <technology> <tag>
             searchWebApi = container "Search Web API" "Allows only authorized users searching books records via HTTPS API" "Go"
             adminWebApi = container "Admin Web API" "Allows only authorized users administering books details via HTTPS API" "Go" {
@@ -19,6 +24,19 @@ workspace extends ../system-catalog.dsl {
             bookEventStream = container "Book Event Stream" "Handles book-related domain events" "Apache Kafka 3.0"
             bookEventConsumer = container "Book Event Consumer" "Listening to domain events and write publisher to Search Database for updating" "Go"
             publisherRecurrentUpdater = container "Publisher Recurrent Updater" "Listening to external events from Publisher System, and update book information" "Go"
+        }
+        
+        # External Software Systems
+        authSystem = softwareSystem "Authorization System" "The external Identiy Provider Platform" "External System"
+        publisherSystem = softwareSystem "Publisher System" "The 3rd party system of publishers that gives details about books published by them" "External System"
+        
+        # Relationship between People and Software Systems
+        # <variable> -> <variable> <description> <protocol>
+        publicUser -> bookstoreSystem "View book information"
+        authorizedUser -> bookstoreSystem "Search book with more details, administrate books and their details"
+        bookstoreSystem -> authSystem "Register new user, and authorize user access"
+        publisherSystem -> bookstoreSystem "Publish events for new book publication, and book information updates" {
+            tags "Async Request"
         }
 
         # Relationship between Containers
@@ -52,32 +70,8 @@ workspace extends ../system-catalog.dsl {
         authService -> authSystem "Authorize user permissions" "JSON/HTTPS"
         bookService -> bookstoreDatabase "Read/Write data" "ODBC"
         bookEventPublisher -> bookEventStream "Publish book update events"
-
-        developer = person "Developer" "Internal bookstore platform developer" "User"
-
-        deployWorkflow = softwareSystem "CI/CD Workflow" "Workflow CI/CD for deploying system using AWS Services" "Target System" {
-            repository = container "Code Repository" "" "Github"
-            pipeline = container "CodePipeline" {
-                tags "Amazon Web Services - CodePipeline" "Dynamic Element"
-            }
-            codeBuilder = container "CodeBuild" "" {
-                tags "Amazon Web Services - CodeBuild" "Dynamic Element"
-            }
-            containerRegistry = container "Amazon ECR" {
-                tags "Amazon Web Services - EC2 Container Registry" "Dynamic Element"
-            }
-            cluster = container "Amazon EKS" {
-                tags "Amazon Web Services - Elastic Kubernetes Service" "Dynamic Element"
-            }
-        }
-
-        developer -> repository
-        repository -> pipeline
-        pipeline -> codeBuilder
-        codeBuilder -> containerRegistry
-        codeBuilder -> pipeline
-        pipeline -> cluster
     }
+
     views {
         # Level 1
         systemContext bookstoreSystem "SystemContext" {
@@ -96,17 +90,32 @@ workspace extends ../system-catalog.dsl {
             include *
             autoLayout lr
         }
-        # Dynamic <container> <name> <description>
-        dynamic deployWorkflow "Dynamic-001-WF" "Bookstore platform deployment workflow" {
-            developer -> repository "Commit, and push changes"
-            repository -> pipeline "Trigger pipeline job"
-            pipeline -> codeBuilder "Download source code, and start build process"
-            codeBuilder -> containerRegistry "Upload Docker image with unique tag"
-            codeBuilder -> pipeline "Return the build result"
-            pipeline -> cluster "Deploy container"
-            autoLayout lr
+
+
+        styles {
+            # element <tag> {}
+            element "Customer" {
+                background #08427B
+                color #ffffff
+                fontSize 22
+                shape Person
+            }
+            element "External System" {
+                background #999999
+                color #ffffff
+            }
+            relationship "Relationship" {
+                dashed false
+            }
+            relationship "Async Request" {
+                dashed true
+            }
+            element "Database" {
+                shape Cylinder
+            }
         }
-        
+
         theme default
     }
+
 }

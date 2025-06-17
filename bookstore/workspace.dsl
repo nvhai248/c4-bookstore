@@ -1,4 +1,4 @@
-workspace extends system.dsl {
+workspace extends models.dsl {
     model {       
         # Deployment
         prodEnvironment = deploymentEnvironment "Production" {
@@ -59,12 +59,45 @@ workspace extends system.dsl {
             appLoadBalancer -> searchWebApiInstance "Forwards requests to" "[HTTPS]"
             appLoadBalancer -> adminWebApiInstance "Forwards requests to" "[HTTPS]"
         }
+
+        developer = person "Developer" "Internal bookstore platform developer" "User"
+        deployWorkflow = softwareSystem "CI/CD Workflow" "Workflow CI/CD for deploying system using AWS Services" "Target System" {
+            repository = container "Code Repository" "" "Github"
+            pipeline = container "CodePipeline" {
+                tags "Amazon Web Services - CodePipeline" "Dynamic Element"
+            }
+            codeBuilder = container "CodeBuild" "" {
+                tags "Amazon Web Services - CodeBuild" "Dynamic Element"
+            }
+            containerRegistry = container "Amazon ECR" {
+                tags "Amazon Web Services - EC2 Container Registry" "Dynamic Element"
+            }
+            cluster = container "Amazon EKS" {
+                tags "Amazon Web Services - Elastic Kubernetes Service" "Dynamic Element"
+            }
+        }
+        developer -> repository
+        repository -> pipeline
+        pipeline -> codeBuilder
+        codeBuilder -> containerRegistry
+        codeBuilder -> pipeline
+        pipeline -> cluster
     }
 
     views {
         # deployment <software-system> <environment> <key> <description>
         deployment bookstoreSystem prodEnvironment "Dep-001-PROD" "Cloud Architecture for Bookstore Platform using AWS Services" {
             include *
+            autoLayout lr
+        }
+        # dynamic <container> <name> <description>
+        dynamic deployWorkflow "Dynamic-001-WF" "Bookstore platform deployment workflow" {
+            developer -> repository "Commit, and push changes"
+            repository -> pipeline "Trigger pipeline job"
+            pipeline -> codeBuilder "Download source code, and start build process"
+            codeBuilder -> containerRegistry "Upload Docker image with unique tag"
+            codeBuilder -> pipeline "Return the build result"
+            pipeline -> cluster "Deploy container"
             autoLayout lr
         }
 
